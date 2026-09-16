@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useRef } from "react";
 import JSZip from "jszip";
+import * as XLSX from "xlsx";
 import {
   FolderArchive,
   UploadCloud,
@@ -13,6 +14,8 @@ import {
   Sparkles,
   Database,
   Check,
+  FileSpreadsheet,
+  Download,
 } from "lucide-react";
 import {
   extractTextFromPdf,
@@ -564,8 +567,122 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
   const zipInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const multiFileInputRef = useRef<HTMLInputElement>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
+
+  // Clean and normalize phone numbers
+  const cleanPhoneStr = (val: any): string => {
+    if (val === undefined || val === null) return "";
+    let str = String(val).trim();
+    if (/^[0-9]+(\.[0-9]+)?e\+[0-9]+$/i.test(str)) {
+      str = Number(val).toLocaleString("fullwide", { useGrouping: false });
+    }
+    return str.replace(/[()\s\-.]/g, "");
+  };
+
+  // Helper to parse Excel file into ParsedBulkItem[]
+  const parseExcelFile = async (file: File): Promise<ParsedBulkItem[]> => {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const firstSheet = workbook.SheetNames[0];
+    if (!firstSheet) return [];
+    const rows = XLSX.utils.sheet_to_json<Record<string, any>>(workbook.Sheets[firstSheet], {
+      defval: "",
+    });
+
+    if (rows.length === 0) return [];
+    const headers = Object.keys(rows[0] || {});
+
+    const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const findKey = (targets: string[]) =>
+      headers.find((h) =>
+        targets.some((t) => clean(h).includes(clean(t)) || clean(t).includes(clean(h))),
+      );
+
+    const nameKey = findKey(["name", "trainer name", "full name", "trainer", "candidate", "faculty"]);
+    const phoneKey = findKey([
+      "phone",
+      "phonenumber",
+      "phone number",
+      "mobile",
+      "contact",
+      "whatsapp",
+      "tel",
+      "cell",
+    ]);
+    const domainKey = findKey([
+      "domain",
+      "skills",
+      "skill",
+      "technology",
+      "specialization",
+      "subject",
+      "domain / skill",
+    ]);
+    const emailKey = findKey(["email", "mail", "email address"]);
+    const cityKey = findKey(["city", "location", "place"]);
+    const expKey = findKey(["experience", "exp", "years", "total exp"]);
+
+    const results: ParsedBulkItem[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const name = nameKey && r[nameKey] ? String(r[nameKey]).trim() : "";
+      const phone = phoneKey && r[phoneKey] !== undefined ? cleanPhoneStr(r[phoneKey]) : "";
+      const domain = domainKey && r[domainKey] ? String(r[domainKey]).trim() : "Aptitude & Soft Skills";
+      const email =
+        emailKey && r[emailKey]
+          ? String(r[emailKey]).trim()
+          : `${(name || "trainer").toLowerCase().replace(/[^a-z0-9]/g, "")}@atom.ac.in`;
+      const city = cityKey && r[cityKey] ? String(r[cityKey]).trim() : "Bangalore";
+      const exp = expKey && r[expKey] ? Number(r[expKey]) || 5 : 5;
+
+      if (!name && !phone) continue;
+
+      const dup = checkDuplicate(phone, email, name);
+      const skillNames = Array.from(
+        new Set(
+          domain
+            .split(/[,+/&]+/)
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0),
+        ),
+      );
+      const skills =
+        skillNames.length > 0
+          ? skillNames.map((s) => ({ name: s, level: "Expert" as const, years: exp }))
+          : [{ name: domain, level: "Expert" as const, years: exp }];
+
+      results.push({
+        id: `bulk-excel-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 5)}`,
+        name: name || "Unnamed Trainer",
+        designation: `${domain} Trainer`,
+        phone: phone || "9845000000",
+        whatsapp: phone || "9845000000",
+        email,
+        city,
+        state: "Karnataka",
+        experience: exp,
+        trainingExperience: Math.max(1, Math.round(exp * 0.75)),
+        trainerType:
+          domain.toLowerCase().includes("aptitude") || domain.toLowerCase().includes("soft skills")
+            ? "Aptitude Trainer"
+            : "Technical Trainer",
+        skills,
+        bio: `Experienced corporate faculty specializing in ${domain}.`,
+        education: [{ degree: "B.Tech / MCA", college: "State University", year: 2024 - exp }],
+        certifications: [
+          { name: `Certified ${skills[0]?.name || "Domain"} Trainer`, issuer: "ATOM Accreditation" },
+        ],
+        fileName: file.name,
+        selected: Boolean(name && phone && phone.length >= 7),
+        isDuplicate: dup.isDuplicate,
+        duplicateReason: dup.reason,
+      });
+    }
+
+    return results;
+  };
 
   // Process raw files in bulk
   const processFiles = async (files: File[]) => {
@@ -578,6 +695,19 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
       setProgress({ current: i + 1, total: files.length, filename: file.name });
 
       try {
+        if (
+          file.name.endsWith(".xlsx") ||
+          file.name.endsWith(".xls") ||
+          file.name.endsWith(".csv") ||
+          file.type.includes("spreadsheet") ||
+          file.type.includes("excel") ||
+          file.type.includes("csv")
+        ) {
+          const excelParsed = await parseExcelFile(file);
+          parsedItems.push(...excelParsed);
+          continue;
+        }
+
         let text = "";
         if (file.name.endsWith(".pdf") || file.type === "application/pdf") {
           const buffer = await file.arrayBuffer();
@@ -606,7 +736,51 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
 
     setItems((prev) => [...prev, ...parsedItems]);
     setIsProcessing(false);
-    toast.success(`Successfully parsed ${parsedItems.length} trainer resumes in batch!`);
+    toast.success(`Successfully parsed ${parsedItems.length} trainer records in batch!`);
+  };
+
+  // Handle Excel upload
+  const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processFiles(Array.from(e.target.files));
+    }
+  };
+
+  // Download Sample Excel Template
+  const downloadSampleTemplate = (format: "xlsx" | "csv") => {
+    const sampleData = [
+      {
+        "Trainer Name": "Ramesh S",
+        "Phone Number": "9845012345",
+        "Domain / Skills": "Aptitude, Soft Skills, Communication",
+      },
+      {
+        "Trainer Name": "Chaitra Rao",
+        "Phone Number": "8861796089",
+        "Domain / Skills": "Java Full Stack, Spring Boot, MySQL",
+      },
+      {
+        "Trainer Name": "Meghana Rao",
+        "Phone Number": "9845099887",
+        "Domain / Skills": "Python, Machine Learning, Data Science",
+      },
+      {
+        "Trainer Name": "Abhinav Kashyap",
+        "Phone Number": "9876501234",
+        "Domain / Skills": "Aptitude & Verbal Ability",
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Trainers");
+
+    if (format === "xlsx") {
+      XLSX.writeFile(workbook, "ATOM_Trainers_Bulk_Upload_Template.xlsx");
+    } else {
+      XLSX.writeFile(workbook, "ATOM_Trainers_Bulk_Upload_Template.csv");
+    }
+    toast.success(`Downloaded sample ${format.toUpperCase()} template!`);
   };
 
   // Handle ZIP upload
@@ -837,6 +1011,13 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
         {/* Hidden File Inputs */}
         <input
           type="file"
+          ref={excelInputRef}
+          onChange={handleExcelUpload}
+          accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+          className="hidden"
+        />
+        <input
+          type="file"
           ref={zipInputRef}
           onChange={handleZipUpload}
           accept=".zip,application/zip,application/x-zip-compressed"
@@ -885,13 +1066,27 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
         {/* Upload Zone (Shown when no items loaded) */}
         {!isProcessing && items.length === 0 && (
           <div className="my-6 space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {/* Option 1: ZIP Upload */}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Option 1: Excel & CSV Spreadsheet Upload (Name, Phone, Domain) */}
+              <div
+                onClick={() => excelInputRef.current?.click()}
+                className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-500/40 bg-emerald-500/5 p-5 text-center transition-all hover:border-emerald-500 hover:bg-emerald-500/10 cursor-pointer"
+              >
+                <div className="rounded-xl bg-emerald-500/10 p-3 text-emerald-600 dark:text-emerald-400 mb-2.5 group-hover:scale-105 transition-transform">
+                  <FileSpreadsheet className="h-6 w-6" />
+                </div>
+                <h3 className="text-xs font-bold text-foreground">Excel / CSV Spreadsheet</h3>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Upload .xlsx or .csv with Name, Phone Number & Domain columns
+                </p>
+              </div>
+
+              {/* Option 2: ZIP Upload */}
               <div
                 onClick={() => zipInputRef.current?.click()}
-                className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 p-6 text-center transition-all hover:border-primary hover:bg-primary/10 cursor-pointer"
+                className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 p-5 text-center transition-all hover:border-primary hover:bg-primary/10 cursor-pointer"
               >
-                <div className="rounded-xl bg-primary/10 p-3 text-primary mb-3 group-hover:scale-105 transition-transform">
+                <div className="rounded-xl bg-primary/10 p-3 text-primary mb-2.5 group-hover:scale-105 transition-transform">
                   <FileArchive className="h-6 w-6" />
                 </div>
                 <h3 className="text-xs font-bold text-foreground">Upload .ZIP Archive</h3>
@@ -900,12 +1095,12 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
                 </p>
               </div>
 
-              {/* Option 2: Folder Upload */}
+              {/* Option 3: Folder Upload */}
               <div
                 onClick={() => folderInputRef.current?.click()}
-                className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-500/30 bg-blue-500/5 p-6 text-center transition-all hover:border-blue-500 hover:bg-blue-500/10 cursor-pointer"
+                className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-500/30 bg-blue-500/5 p-5 text-center transition-all hover:border-blue-500 hover:bg-blue-500/10 cursor-pointer"
               >
-                <div className="rounded-xl bg-blue-500/10 p-3 text-blue-600 dark:text-blue-400 mb-3 group-hover:scale-105 transition-transform">
+                <div className="rounded-xl bg-blue-500/10 p-3 text-blue-600 dark:text-blue-400 mb-2.5 group-hover:scale-105 transition-transform">
                   <UploadCloud className="h-6 w-6" />
                 </div>
                 <h3 className="text-xs font-bold text-foreground">Select Folder of Resumes</h3>
@@ -914,12 +1109,12 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
                 </p>
               </div>
 
-              {/* Option 3: Multi-file picker */}
+              {/* Option 4: Multi-file picker */}
               <div
                 onClick={() => multiFileInputRef.current?.click()}
-                className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-purple-500/30 bg-purple-500/5 p-6 text-center transition-all hover:border-purple-500 hover:bg-purple-500/10 cursor-pointer"
+                className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-purple-500/30 bg-purple-500/5 p-5 text-center transition-all hover:border-purple-500 hover:bg-purple-500/10 cursor-pointer"
               >
-                <div className="rounded-xl bg-purple-500/10 p-3 text-purple-600 dark:text-purple-400 mb-3 group-hover:scale-105 transition-transform">
+                <div className="rounded-xl bg-purple-500/10 p-3 text-purple-600 dark:text-purple-400 mb-2.5 group-hover:scale-105 transition-transform">
                   <FolderArchive className="h-6 w-6" />
                 </div>
                 <h3 className="text-xs font-bold text-foreground">Select Multiple Files</h3>
@@ -929,24 +1124,34 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
               </div>
             </div>
 
-            {/* Demo Quick Button */}
-            <div className="rounded-2xl border border-border bg-muted/40 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            {/* Template Download & Demo Quick Bar */}
+            <div className="rounded-2xl border border-border bg-muted/40 p-4 flex flex-col lg:flex-row items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                  <Sparkles className="h-4 w-4 text-primary" /> Instant 50 Trainer Batch Demo
+                  <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Excel Template & Instant 50 Trainer Demo
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Test entering 50 trainer profiles with realistic names, aptitude, soft skills,
-                  full stack tech & contact data in 1 click
+                  Download a pre-formatted Excel template (Name, Phone Number, Domain) or test with 50 generated profiles
                 </p>
               </div>
-              <button
-                onClick={handleLoad50DemoProfiles}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 active:scale-98 cursor-pointer shrink-0"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Load 50 Sample Resumes</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => downloadSampleTemplate("xlsx")}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-muted transition-colors cursor-pointer shadow-xs"
+                >
+                  <Download className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Excel Template (.xlsx)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLoad50DemoProfiles}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 active:scale-98 cursor-pointer"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Load 50 Sample Resumes</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

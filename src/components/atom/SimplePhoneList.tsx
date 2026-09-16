@@ -1,8 +1,19 @@
-import React, { useState } from "react";
-import { Phone, MessageCircle, Copy, Check, Sparkles, Plus, UserPlus } from "lucide-react";
+import React, { useState, useRef } from "react";
+import {
+  Phone,
+  MessageCircle,
+  Copy,
+  Check,
+  Sparkles,
+  Plus,
+  UserPlus,
+  FileSpreadsheet,
+  UploadCloud,
+} from "lucide-react";
 import type { Trainer } from "@/lib/trainers";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
+import { ExcelBulkUploadModal } from "./ExcelBulkUploadModal";
 
 interface SimplePhoneListProps {
   trainers: { trainer: Trainer; matchPercentage?: number }[];
@@ -17,6 +28,11 @@ export function SimplePhoneList({
 }: SimplePhoneListProps) {
   const { addTrainer, checkDuplicate } = useStore();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Bulk Excel Upload Modal state
+  const [excelModalOpen, setExcelModalOpen] = useState(false);
+  const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
+  const excelFileInputRef = useRef<HTMLInputElement>(null);
 
   // Inline Quick Add state (Name, Phone, Domain only)
   const [quickName, setQuickName] = useState("");
@@ -35,6 +51,13 @@ export function SimplePhoneList({
     const numbers = trainers.map(({ trainer }) => trainer.phone).join(", ");
     navigator.clipboard.writeText(numbers);
     toast.success(`Copied ${trainers.length} phone numbers to clipboard!`);
+  };
+
+  const handleExcelFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setDroppedFiles(Array.from(e.target.files));
+      setExcelModalOpen(true);
+    }
   };
 
   const handleInlineQuickAdd = async (e: React.FormEvent) => {
@@ -108,6 +131,25 @@ export function SimplePhoneList({
 
   return (
     <div className="card-surface rounded-2xl border border-border shadow-sm overflow-hidden">
+      {/* Hidden File Input for Excel Upload */}
+      <input
+        type="file"
+        ref={excelFileInputRef}
+        onChange={handleExcelFileSelected}
+        accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+        className="hidden"
+      />
+
+      {/* Bulk Excel Upload Modal */}
+      <ExcelBulkUploadModal
+        isOpen={excelModalOpen}
+        onClose={() => {
+          setExcelModalOpen(false);
+          setDroppedFiles([]);
+        }}
+        initialFiles={droppedFiles}
+      />
+
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/30 px-5 py-3.5">
         <div>
@@ -124,15 +166,27 @@ export function SimplePhoneList({
             actions
           </p>
         </div>
-        <button
-          onClick={copyAllNumbers}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-colors cursor-pointer shadow-xs"
-        >
-          <Copy className="h-3.5 w-3.5 text-primary" /> Copy All Phone Numbers
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setDroppedFiles([]);
+              setExcelModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors cursor-pointer shadow-xs"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            <span>Excel / CSV Bulk Upload</span>
+          </button>
+          <button
+            onClick={copyAllNumbers}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-colors cursor-pointer shadow-xs"
+          >
+            <Copy className="h-3.5 w-3.5 text-primary" /> Copy All Phone Numbers
+          </button>
+        </div>
       </div>
 
-      {/* Inline Quick Add Bar (Name, Phone, Domain only) */}
+      {/* Inline Quick Add Bar (Name, Phone, Domain only) & Excel Bulk Upload */}
       <div className="border-b border-border bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 px-5 py-3">
         <form
           onSubmit={handleInlineQuickAdd}
@@ -170,7 +224,21 @@ export function SimplePhoneList({
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-xs hover:opacity-90 active:scale-98 disabled:opacity-50 cursor-pointer shrink-0 transition-all"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>{isAdding ? "Saving..." : "Add "}</span>
+            <span>{isAdding ? "Saving..." : "Add"}</span>
+          </button>
+
+          {/* Excel / CSV Bulk Upload Button in Quick Add bar */}
+          <button
+            type="button"
+            onClick={() => {
+              setDroppedFiles([]);
+              setExcelModalOpen(true);
+            }}
+            title="Bulk upload trainers via Excel (.xlsx) or CSV spreadsheet with Name, Phone Number, and Domain"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-98 cursor-pointer shrink-0 transition-all"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            <span>Bulk Upload Excel</span>
           </button>
         </form>
       </div>

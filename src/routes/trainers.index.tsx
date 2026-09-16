@@ -19,6 +19,7 @@ import { AppShell } from "@/components/atom/AppShell";
 import { TrainerCard, ContactActions, StatusPill } from "@/components/atom/TrainerCard";
 import { searchTrainers, type Availability, type Trainer } from "@/lib/trainers";
 import { useStore } from "@/lib/store";
+import { ExcelBulkUploadModal } from "@/components/atom/ExcelBulkUploadModal";
 
 export const Route = createFileRoute("/trainers/")({
   head: () => ({
@@ -73,18 +74,6 @@ function Directory() {
 
   // Bulk Import modal state
   const [importOpen, setImportOpen] = useState(false);
-  const [importText, setImportText] = useState("");
-  const [importPreview, setImportPreview] = useState<
-    Array<{
-      name: string;
-      phone: string;
-      email: string;
-      city: string;
-      skills: string;
-      exp: number;
-      duplicate: boolean;
-    }>
-  >([]);
 
   // Extract unique dynamic skills and cities from current state
   const allSkills = useMemo(
@@ -178,102 +167,7 @@ function Directory() {
   }
 
   // Handle sample import file parsing
-  function handleParseCsv() {
-    if (!importText.trim()) {
-      toast.error("Please paste CSV data or select a sample template.");
-      return;
-    }
-    const lines = importText.trim().split("\n");
-    const parsed = lines.slice(1).map((line) => {
-      const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
-      const name = cols[0] || "Unknown Trainer";
-      const phone = cols[1] || "+919800000000";
-      const email = cols[2] || `${name.toLowerCase().replace(/[^a-z]/g, "")}@example.com`;
-      const city = cols[3] || "Bangalore";
-      const skills = cols[4] || "Java, Python";
-      const exp = Number(cols[5]) || 5;
 
-      const dupCheck = checkDuplicate(phone, email, name);
-      return {
-        name,
-        phone,
-        email,
-        city,
-        skills,
-        exp,
-        duplicate: dupCheck.isDuplicate,
-      };
-    });
-    setImportPreview(parsed);
-  }
-
-  async function handleCommitImport() {
-    let count = 0;
-    for (const row of importPreview) {
-      if (!row.duplicate) {
-        await addTrainer({
-          name: row.name,
-          designation: `${row.skills.split(",")[0]?.trim() || "Technology"} Trainer`,
-          phone: row.phone,
-          whatsapp: row.phone,
-          email: row.email,
-          city: row.city,
-          state: "Karnataka",
-          country: "India",
-          organization: "Consultant",
-          experience: row.exp,
-          trainingExperience: Math.max(1, row.exp - 2),
-          trainerType: "Technical Trainer",
-          employment: "Freelance",
-          modes: ["Online", "Offline"],
-          availability: "available",
-          rating: 4.5,
-          projectsCompleted: 2,
-          bio: `Experienced corporate trainer specializing in ${row.skills}.`,
-          status: "Active",
-          tags: ["New Import"],
-          skills: row.skills
-            .split(",")
-            .map((s) => ({ name: s.trim(), level: "Advanced", years: row.exp })),
-          softSkills: ["Communication"],
-          education: [
-            {
-              degree: "B.Tech / B.E.",
-              specialization: "Computer Science",
-              university: "State University",
-              year: 2018,
-            },
-          ],
-          certifications: [],
-          trainings: [],
-          notes: [
-            {
-              note: "Imported via bulk CSV upload.",
-              by: "Admin",
-              date: new Date().toISOString().split("T")[0],
-            },
-          ],
-          documents: [
-            {
-              name: "Trainer CV.pdf",
-              type: "CV",
-              date: new Date().toISOString().split("T")[0],
-              by: "Admin",
-            },
-          ],
-          sectors: ["College", "Corporate"],
-          addedOn: new Date().toISOString().split("T")[0],
-          photo: `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(row.name)}&backgroundColor=d7f2e3,e7f6ec,cdeedd`,
-        });
-        count++;
-      }
-    }
-
-    toast.success(`Successfully imported ${count} trainers!`);
-    setImportOpen(false);
-    setImportText("");
-    setImportPreview([]);
-  }
 
   const Chip = ({
     active,
@@ -355,9 +249,9 @@ function Directory() {
             {currentRole === "Admin" && (
               <button
                 onClick={() => setImportOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2 text-xs font-semibold hover:bg-muted"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer"
               >
-                <Upload className="h-3.5 w-3.5 text-muted-foreground" /> Import CSV
+                <FileSpreadsheet className="h-3.5 w-3.5" /> Import Excel / CSV
               </button>
             )}
 
@@ -681,121 +575,8 @@ function Directory() {
         </div>
       </div>
 
-      {/* Bulk CSV Import Dialog */}
-      {importOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="h-5 w-5 text-primary" />
-                <h3 className="text-base font-bold text-foreground">Bulk Import Trainers (CSV)</h3>
-              </div>
-              <button
-                onClick={() => setImportOpen(false)}
-                className="rounded-lg p-1 text-muted-foreground hover:bg-muted"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="space-y-4 text-xs">
-              <p className="text-muted-foreground">
-                Paste comma-separated trainer records below. Columns:{" "}
-                <code className="rounded bg-muted px-1 py-0.5 font-semibold text-foreground">
-                  Name, Phone, Email, City, Skills, Experience
-                </code>
-              </p>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setImportText(
-                    `Name,Phone,Email,City,Skills,Experience\nVikram Seth,+919845012320,vikram.seth@example.com,Bangalore,Golang; Kubernetes; Docker,7\nAnanya Rao,+919845012321,ananya.rao@example.com,Hyderabad,React; TypeScript; Next.js,5\nRahul Sharma,+919845012301,rahul.sharma@example.com,Bangalore,Java; Spring Boot,8`,
-                  )
-                }
-                className="text-xs font-semibold text-primary hover:underline"
-              >
-                Insert Sample Data (includes 1 duplicate for test)
-              </button>
-
-              <textarea
-                rows={5}
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                placeholder="Name,Phone,Email,City,Skills,Experience..."
-                className="w-full rounded-xl border border-border bg-muted/40 p-3 font-mono text-xs outline-none focus:border-primary focus:bg-card"
-              />
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleParseCsv}
-                  className="rounded-xl bg-muted px-4 py-2 text-xs font-bold hover:bg-muted/80"
-                >
-                  Validate & Preview
-                </button>
-              </div>
-
-              {/* Preview Table */}
-              {importPreview.length > 0 && (
-                <div className="mt-4 max-h-56 overflow-y-auto rounded-xl border border-border p-3">
-                  <p className="mb-2 font-bold text-foreground">
-                    Parsed Records ({importPreview.length}):
-                  </p>
-                  <div className="space-y-2">
-                    {importPreview.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className={`flex items-center justify-between rounded-lg p-2 ${
-                          item.duplicate
-                            ? "bg-destructive/10 border border-destructive/30"
-                            : "bg-muted/50"
-                        }`}
-                      >
-                        <div>
-                          <p className="font-semibold text-foreground">
-                            {item.name} ({item.phone})
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {item.email} • {item.city} • {item.skills} ({item.exp} yrs)
-                          </p>
-                        </div>
-                        {item.duplicate ? (
-                          <span className="flex items-center gap-1 rounded bg-destructive/20 px-2 py-0.5 text-[10px] font-bold text-destructive">
-                            <AlertTriangle className="h-3 w-3" /> Duplicate Skipped
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 rounded bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary">
-                            <CheckCircle2 className="h-3 w-3" /> Valid
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setImportOpen(false)}
-                  className="rounded-xl border border-border px-4 py-2 text-xs font-semibold hover:bg-muted"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={importPreview.length === 0}
-                  onClick={handleCommitImport}
-                  className="rounded-xl bg-primary px-5 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
-                >
-                  Confirm Import ({importPreview.filter((p) => !p.duplicate).length} Records)
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Bulk Excel/CSV Import Dialog */}
+      <ExcelBulkUploadModal isOpen={importOpen} onClose={() => setImportOpen(false)} />
     </AppShell>
   );
 }
