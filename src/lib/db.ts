@@ -29,19 +29,9 @@ export async function initializeDatabase() {
   if (isInitialized) return;
 
   try {
-    // 1. Ensure database exists
-    const rootConn = await mysql.createConnection({
-      host: dbConfig.host,
-      port: dbConfig.port,
-      user: dbConfig.user,
-      password: dbConfig.password,
-    });
-    await rootConn.query(
-      `CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
-    );
-    await rootConn.end();
-
     const db = getDbPool();
+
+    // 1. Create trainers table
 
     // 2. Create trainers table
     await db.query(`
