@@ -3,7 +3,7 @@ import mysql from "mysql2/promise";
 import { TRAINERS, type Trainer } from "./trainers";
 
 
-  const dbConfig = {
+  export const dbConfig = {
   host: process.env.MYSQL_HOST,
   port: Number(process.env.MYSQL_PORT),
   user: process.env.MYSQL_USER,
