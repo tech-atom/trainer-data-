@@ -63,6 +63,7 @@ function mysqlApiPlugin(): Plugin {
   };
 }
 
+
 export default defineConfig({
   nitro: {
     preset: "node-server",
