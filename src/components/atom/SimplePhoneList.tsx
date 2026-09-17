@@ -261,9 +261,7 @@ export function SimplePhoneList({
               const cleanPhone = trainer.whatsapp.replace(/[^0-9]/g, "");
               const whatsappNumber = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
               const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-                `Hello ${trainer.name}, We are from Team ATOM, and we are currently looking for a trainer. 
-                We would like to check your availability and discuss the opportunity with you. 
-                Please let us know a convenient time to connect.`,
+                `Hello ${trainer.name}, We are from Team ATOM, and we are currently looking for a trainer.We would like to check your availability and discuss the opportunity with you.Please let us know a convenient time to connect.`,
               )}`;
 
               return (
