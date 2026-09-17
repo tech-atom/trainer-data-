@@ -2,16 +2,18 @@
 import mysql from "mysql2/promise";
 import { TRAINERS, type Trainer } from "./trainers";
 
-export const dbConfig = {
-  host: process.env.MYSQL_HOST || "localhost",
-  port: Number(process.env.MYSQL_PORT || 3306),
-  user: process.env.MYSQL_USER || "root",
-  password: process.env.MYSQL_PASSWORD || "12345",
-  database: process.env.MYSQL_DATABASE || "atom_trainer_hub",
+
+  const dbConfig = {
+  host: process.env.MYSQL_HOST,
+  port: Number(process.env.MYSQL_PORT),
+  user: process.env.MYSQL_USER,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQL_DATABASE,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
 };
+
 
 let pool: mysql.Pool | null = null;
 let isInitialized = false;
