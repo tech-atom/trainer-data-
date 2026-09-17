@@ -3,17 +3,16 @@ import mysql from "mysql2/promise";
 import { TRAINERS, type Trainer } from "./trainers";
 
 
- export const dbConfig = {
-  host: process.env.MYSQLHOST,
-  port: Number(process.env.MYSQLPORT),
-  user: process.env.MYSQLUSER,
-  password: process.env.MYSQLPASSWORD,
-  database: process.env.MYSQLDATABASE,
+export const dbConfig = {
+  host: process.env.MYSQLHOST || "mysql.railway.internal",
+  port: Number(process.env.MYSQLPORT || 3306),
+  user: process.env.MYSQLUSER || "root",
+  password: process.env.MYSQLPASSWORD || "",
+  database: process.env.MYSQLDATABASE || "railway",
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
 };
-
 
 let pool: mysql.Pool | null = null;
 let isInitialized = false;
@@ -31,6 +30,14 @@ export async function initializeDatabase() {
   try {
     const db = getDbPool();
 
+    const connection = await db.getConnection();
+
+    try {
+      const [rows] = await connection.query("SELECT DATABASE() AS db");
+      console.log("Connected database:", rows);
+    } finally {
+      connection.release();
+    }
     // 1. Create trainers table
 
     // 2. Create trainers table
