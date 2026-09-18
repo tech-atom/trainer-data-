@@ -20,32 +20,29 @@ export function MinimalistHeader({}: MinimalistHeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-        {/* Brand & Stats */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          <Link to="/" className="flex items-center gap-3 transition-opacity hover:opacity-90">
+    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur-md shadow-2xs">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-3 sm:px-6 py-2.5">
+        {/* Left: Brand Logo */}
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+          <Link to="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-90">
             <img
               src="/atom-logo.png"
               alt="ATOM"
-              className="h-9 w-auto object-contain shrink-0"
+              className="h-8 sm:h-9 w-auto object-contain shrink-0"
             />
-            <div>
+            <div className="hidden sm:block">
               <div className="flex items-center gap-1.5">
                 <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[10px] font-bold text-primary uppercase tracking-wider">
                   Trainer Hub
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground hidden sm:block">
-               
-              </p>
             </div>
           </Link>
         </div>
 
-        {/* Admin User Info & Logout */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="hidden lg:block text-right">
+        {/* Right: Admin User Info & Logout */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="hidden sm:block text-right">
             <p className="text-xs font-bold text-foreground leading-none">{currentUser.name}</p>
             <p className="text-[10px] text-muted-foreground">{currentUser.email}</p>
           </div>
@@ -61,4 +58,6 @@ export function MinimalistHeader({}: MinimalistHeaderProps) {
     </header>
   );
 }
+
+
 

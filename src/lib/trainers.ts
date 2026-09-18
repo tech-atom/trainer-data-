@@ -325,3 +325,207 @@ export function computeDomainCounts(trainers: Trainer[]) {
   };
 }
 
+export function isQuickContactTrainer(trainer: Trainer): boolean {
+  if (
+    trainer.tags?.some((t) =>
+      [
+        "Quick Contact",
+        "Excel Bulk Import",
+        "Minimal Contact",
+        "Phone Directory",
+        "Name & Phone Directory",
+        "Manual Quick Add",
+      ].includes(t),
+    )
+  ) {
+    return true;
+  }
+  if (
+    trainer.tags?.some((t) =>
+      ["Full Profile", "Verified Profile", "PDF Resume Upload", "Comprehensive"].includes(t),
+    )
+  ) {
+    return false;
+  }
+  // If no education, certifications, trainings, and documents, it's a minimal/quick contact
+  const hasDetailedRecords =
+    (trainer.education && trainer.education.length > 0) ||
+    (trainer.certifications && trainer.certifications.length > 0) ||
+    (trainer.trainings && trainer.trainings.length > 0) ||
+    (trainer.documents && trainer.documents.length > 0);
+
+  return !hasDetailedRecords;
+}
+
+export function isFullProfileTrainer(trainer: Trainer): boolean {
+  return !isQuickContactTrainer(trainer);
+}
+
+export function computeSectionCounts(trainers: Trainer[]) {
+  const fullProfiles = trainers.filter(isFullProfileTrainer);
+  const quickContacts = trainers.filter(isQuickContactTrainer);
+
+  const fullDomainCounts = computeDomainCounts(fullProfiles);
+  const quickDomainCounts = computeDomainCounts(quickContacts);
+  const totalDomainCounts = computeDomainCounts(trainers);
+
+  return {
+    total: trainers.length,
+    fullProfilesCount: fullProfiles.length,
+    quickContactsCount: quickContacts.length,
+    fullDomainCounts,
+    quickDomainCounts,
+    totalDomainCounts,
+  };
+}
+
+export interface ScoredTrainerResult {
+  trainer: Trainer;
+  score: number;
+  matchedCount: number;
+  meetsExp: boolean;
+  matchPercentage?: number;
+}
+
+export function scoreAndMatchTrainers(
+  trainersList: Trainer[],
+  requirementQuery: string,
+  queryTokens: string[],
+  minExperience: number | null,
+  cityFilter: string,
+  domainFilter: "All" | "Technical" | "Aptitude" | "Soft Skills",
+  skillAliases: Record<string, string[]> = SKILL_ALIASES,
+): ScoredTrainerResult[] {
+  const hasQuery = requirementQuery.trim().length > 0;
+  const hasTokens = queryTokens.length > 0;
+  const hasMinExp = minExperience !== null && minExperience > 0;
+
+  return trainersList
+    .map((trainer) => {
+      let score = 0;
+      let matchedCount = 0;
+      let meetsExp = true;
+
+      // 1. Check Experience Requirement
+      if (hasMinExp) {
+        if (trainer.experience >= minExperience) {
+          matchedCount++;
+          score += 50 + Math.min(25, (trainer.experience - minExperience) * 3);
+        } else {
+          meetsExp = false;
+        }
+      }
+
+      if (!hasTokens && !hasMinExp) {
+        score = (trainer.rating || 4.5) * 10 + (trainer.availability === "available" ? 20 : 0);
+      } else {
+        for (const token of queryTokens) {
+          let hasSkill = trainer.skills?.some((s) => {
+            const skillLower = s.name.toLowerCase();
+            return skillLower.includes(token) || token.includes(skillLower);
+          });
+
+          if (!hasSkill && skillAliases) {
+            for (const [canonical, aliases] of Object.entries(skillAliases)) {
+              if (
+                canonical.toLowerCase().includes(token) ||
+                aliases.some((a) => a.toLowerCase().includes(token))
+              ) {
+                if (
+                  trainer.skills?.some((s) => s.name.toLowerCase() === canonical.toLowerCase())
+                ) {
+                  hasSkill = true;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (hasSkill) {
+            matchedCount++;
+            score += 40;
+          }
+
+          if (
+            trainer.city?.toLowerCase().includes(token) ||
+            token.includes(trainer.city?.toLowerCase() || "")
+          ) {
+            score += 25;
+            matchedCount++;
+          }
+
+          if (trainer.designation?.toLowerCase().includes(token)) {
+            score += 25;
+            matchedCount++;
+          }
+          if (trainer.trainerType?.toLowerCase().includes(token)) {
+            score += 20;
+            matchedCount++;
+          }
+          if (trainer.name?.toLowerCase().includes(token)) {
+            score += 30;
+            matchedCount++;
+          }
+          if (trainer.phone?.includes(token) || trainer.whatsapp?.includes(token)) {
+            score += 35;
+            matchedCount++;
+          }
+          if (trainer.bio?.toLowerCase().includes(token)) {
+            score += 15;
+            matchedCount++;
+          }
+        }
+
+        if (trainer.availability === "available") score += 15;
+        if (trainer.availability === "partial") score += 8;
+        score += (trainer.rating || 4.5) * 2;
+      }
+
+      const totalExpectedMatches = (hasMinExp ? 1 : 0) + (hasTokens ? queryTokens.length : 1);
+      const maxPossible = Math.max(1, totalExpectedMatches * 45 + 25);
+      const matchPercentage = hasQuery
+        ? Math.min(100, Math.max(55, Math.round((score / maxPossible) * 100)))
+        : undefined;
+
+      return {
+        trainer,
+        score,
+        matchedCount,
+        meetsExp,
+        matchPercentage,
+      };
+    })
+    .filter(({ trainer, matchedCount, meetsExp }) => {
+      if (hasMinExp && !meetsExp) return false;
+
+      if (hasTokens) {
+        if (matchedCount === (hasMinExp ? 1 : 0)) {
+          const isGenericMatch = queryTokens.some(
+            (t) =>
+              (trainer.city && trainer.city.toLowerCase().includes(t)) ||
+              (trainer.name && trainer.name.toLowerCase().includes(t)) ||
+              (trainer.designation && trainer.designation.toLowerCase().includes(t)) ||
+              (trainer.phone && trainer.phone.includes(t)) ||
+              (trainer.whatsapp && trainer.whatsapp.includes(t)) ||
+              (trainer.bio && trainer.bio.toLowerCase().includes(t)) ||
+              (trainer.primarySkill && trainer.primarySkill.toLowerCase().includes(t)),
+          );
+          if (!isGenericMatch) return false;
+        }
+      }
+
+      if (cityFilter !== "All" && trainer.city !== cityFilter) return false;
+
+      if (domainFilter !== "All") {
+        const cat = getTrainerDomainCategory(trainer);
+        if (domainFilter === "Technical" && !cat.isTechnical) return false;
+        if (domainFilter === "Aptitude" && !cat.isAptitude) return false;
+        if (domainFilter === "Soft Skills" && !cat.isSoftSkills) return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => b.score - a.score || (b.trainer.experience || 0) - (a.trainer.experience || 0));
+}
+
+

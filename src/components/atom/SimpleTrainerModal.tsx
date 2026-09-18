@@ -17,9 +17,10 @@ interface SimpleTrainerModalProps {
   trainer: Trainer | null;
   isOpen: boolean;
   onClose: () => void;
+  onEditTrainer?: (trainer: Trainer) => void;
 }
 
-export function SimpleTrainerModal({ trainer, isOpen, onClose }: SimpleTrainerModalProps) {
+export function SimpleTrainerModal({ trainer, isOpen, onClose, onEditTrainer }: SimpleTrainerModalProps) {
   const { deleteTrainer } = useStore();
 
   if (!isOpen || !trainer) return null;
@@ -190,12 +191,25 @@ Please let us know a convenient time to connect.`,
             >
               <Trash2 className="h-3.5 w-3.5" /> Remove Trainer
             </button>
-            <button
-              onClick={onClose}
-              className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 cursor-pointer"
-            >
-              Close
-            </button>
+            <div className="flex items-center gap-2">
+              {onEditTrainer && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onEditTrainer(trainer);
+                  }}
+                  className="rounded-xl border border-primary/40 bg-primary/10 px-3.5 py-2 text-xs font-bold text-primary hover:bg-primary/20 transition-all cursor-pointer"
+                >
+                  Edit / Complete Profile
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       </div>
