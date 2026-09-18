@@ -25,13 +25,16 @@ export function SimpleTrainerModal({ trainer, isOpen, onClose, onEditTrainer }: 
 
   if (!isOpen || !trainer) return null;
 
-  const cleanPhone = trainer.whatsapp.replace(/[^0-9]/g, "");
+  const cleanPhone = (trainer.whatsapp || trainer.phone || "").replace(/[^0-9]/g, "");
+  const hasValidPhone = cleanPhone.length >= 7;
   const whatsappNumber = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-    `Hello ${trainer.name}, We are from Team ATOM, and we are currently looking for a trainer. We would like to check your availability and discuss the opportunity with you.
+  const whatsappUrl = hasValidPhone
+    ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+        `Hello ${trainer.name}, We are from Team ATOM, and we are currently looking for a trainer. We would like to check your availability and discuss the opportunity with you.
 
 Please let us know a convenient time to connect.`,
-  )}`;
+      )}`
+    : "#";
 
   const handleAddRating = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,26 +97,42 @@ Please let us know a convenient time to connect.`,
         <div className="mt-5 space-y-5">
           {/* Quick Contact Bar */}
           <div className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/40 p-3 text-xs">
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white shadow-xs hover:bg-emerald-700"
-            >
-              <MessageCircle className="h-3.5 w-3.5" /> WhatsApp ({trainer.phone})
-            </a>
-            <a
-              href={`tel:${trainer.phone}`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 font-semibold text-foreground hover:bg-muted"
-            >
-              <Phone className="h-3.5 w-3.5 text-primary" /> Call
-            </a>
-            <a
-              href={`mailto:${trainer.email}`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 font-semibold text-foreground hover:bg-muted"
-            >
-              <Mail className="h-3.5 w-3.5 text-primary" /> {trainer.email}
-            </a>
+            {hasValidPhone ? (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white shadow-xs hover:bg-emerald-700"
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> WhatsApp ({trainer.phone || trainer.whatsapp})
+              </a>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted border border-border px-3 py-1.5 font-medium text-muted-foreground opacity-60">
+                <MessageCircle className="h-3.5 w-3.5" /> No Phone Available
+              </span>
+            )}
+
+            {trainer.phone && (
+              <a
+                href={`tel:${trainer.phone}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 font-semibold text-foreground hover:bg-muted"
+              >
+                <Phone className="h-3.5 w-3.5 text-primary" /> Call ({trainer.phone})
+              </a>
+            )}
+
+            {trainer.email ? (
+              <a
+                href={`mailto:${trainer.email}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 font-semibold text-foreground hover:bg-muted"
+              >
+                <Mail className="h-3.5 w-3.5 text-primary" /> {trainer.email}
+              </a>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/40 bg-card px-3 py-1.5 text-muted-foreground/60">
+                <Mail className="h-3.5 w-3.5 text-muted-foreground/40" /> No Email Provided
+              </span>
+            )}
           </div>
 
           {/* Bio / Summary */}
@@ -132,17 +151,21 @@ Please let us know a convenient time to connect.`,
               Skills & Expertise ({trainer.skills.length})
             </h4>
             <div className="flex flex-wrap gap-2">
-              {trainer.skills.map((skill) => (
-                <div
-                  key={skill.name}
-                  className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-bold text-primary"
-                >
-                  <span>{skill.name}</span>
-                  <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
-                    {skill.level} • {skill.years}y
-                  </span>
-                </div>
-              ))}
+              {trainer.skills.length > 0 ? (
+                trainer.skills.map((skill) => (
+                  <div
+                    key={skill.name}
+                    className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-bold text-primary"
+                  >
+                    <span>{skill.name}</span>
+                    <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
+                      {skill.level} • {skill.years}y
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground italic">No specific skills listed.</p>
+              )}
             </div>
           </div>
 
@@ -153,17 +176,17 @@ Please let us know a convenient time to connect.`,
               <h5 className="flex items-center gap-1.5 font-bold text-foreground mb-2">
                 <GraduationCap className="h-4 w-4 text-primary" /> Education
               </h5>
-              {trainer.education.length > 0 ? (
+              {trainer.education && trainer.education.length > 0 ? (
                 trainer.education.map((edu, idx) => (
                   <div key={idx} className="space-y-0.5">
                     <p className="font-semibold text-foreground">{edu.degree}</p>
                     <p className="text-muted-foreground text-[11px]">
-                      {edu.field} • {edu.college} ({edu.year})
+                      {edu.field ? `${edu.field} • ` : ""}{edu.college || ""}{edu.year ? ` (${edu.year})` : ""}
                     </p>
                   </div>
                 ))
               ) : (
-                <p className="text-muted-foreground text-[11px]">Degree verified in record.</p>
+                <p className="text-muted-foreground text-[11px]">No formal education records listed.</p>
               )}
             </div>
 

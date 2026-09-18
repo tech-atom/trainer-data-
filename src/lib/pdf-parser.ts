@@ -363,9 +363,6 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
   } else if (phone.startsWith("0")) {
     phone = phone.substring(1);
   }
-  if (!phone) {
-    phone = "98" + Math.floor(10000000 + Math.random() * 90000000);
-  }
 
   // 3. Name Extraction (Multi-layered robust heuristic)
   let name = "";
@@ -441,12 +438,12 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
   }
 
   if (!name || isSectionHeading(name)) {
-    name = nameFromFileName || "Prajwal S";
+    name = nameFromFileName || "";
   }
 
   // 4. City / Location Extraction
-  let city = "Bangalore";
-  let state = "Karnataka";
+  let city = "";
+  let state = "";
   for (const c of KNOWN_CITIES) {
     const cityRegex = new RegExp(`\\b${c}\\b`, "i");
     if (cityRegex.test(cleanText)) {
@@ -495,14 +492,14 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
     /(?:total\s+)?experience\s*[:|-]?\s*(\d+(?:\.\d+)?)\s*(?:\+?\s*)?(?:years?|yrs?)/i,
   );
   if (expMatch && expMatch[1]) {
-    experience = Math.round(parseFloat(expMatch[1])) || 1;
+    experience = Math.round(parseFloat(expMatch[1])) || 0;
     expFound = true;
   } else {
     const expAlt = cleanText.match(
       /(\d+(?:\.\d+)?)\s*(?:\+?\s*)?(?:years?|yrs?)(?:\s+of)?(?:\s+(?:total|work|relevant|industry|professional|teaching|training))?\s*(?:exp|experience)/i,
     );
     if (expAlt && expAlt[1]) {
-      experience = Math.round(parseFloat(expAlt[1])) || 1;
+      experience = Math.round(parseFloat(expAlt[1])) || 0;
       expFound = true;
     }
   }
@@ -538,7 +535,7 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
     }
   }
 
-  // C. Graduation / College Year Analysis (e.g. "MCA | July 2025", "BCA | July 2023", "B.E 2024")
+  // C. Graduation / College Year Analysis
   if (!expFound) {
     const currentYear = new Date().getFullYear();
     const gradMatch = cleanText.match(
@@ -546,8 +543,8 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
     );
     if (gradMatch && gradMatch[1]) {
       const gradYear = parseInt(gradMatch[1], 10);
-      const diff = Math.max(1, currentYear - gradYear);
-      if (diff >= 0 && diff <= 15) {
+      const diff = currentYear - gradYear;
+      if (diff >= 0 && diff <= 25) {
         experience = diff;
         expFound = true;
       }
@@ -559,19 +556,15 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
     !expFound &&
     /fresher|entry\s*level|internship|intern|student|final\s*year/i.test(cleanText)
   ) {
-    experience = 1;
+    experience = 0;
     expFound = true;
   }
 
-  // E. Fallback based on skill/project depth
-  if (!expFound) {
-    const skillCount = TECH_SKILLS_KEYWORDS.filter((k) =>
-      new RegExp(`\\b${k}\\b`, "i").test(cleanText),
-    ).length;
-    experience = skillCount >= 8 ? 2 : 1;
+  if (expFound && experience > 0) {
+    trainingExperience = Math.max(0, Math.round(experience * 0.75));
+  } else {
+    trainingExperience = 0;
   }
-
-  trainingExperience = Math.max(1, Math.min(experience, Math.round(experience * 0.75)));
 
   // 6. Skills Extraction (Soft Skills, Aptitude, Technical)
   const detectedSkillsMap = new Map<
@@ -599,7 +592,7 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
         detectedSkillsMap.set(normName, {
           name: normName,
           level: "Expert",
-          years: Math.max(1, experience),
+          years: Math.max(1, experience || 1),
         });
       }
     }
@@ -622,16 +615,10 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
         detectedSkillsMap.set(normName, {
           name: normName,
           level: "Expert",
-          years: Math.max(1, experience),
+          years: Math.max(1, experience || 1),
         });
       }
     }
-  }
-
-  if (detectedSkillsMap.size === 0) {
-    detectedSkillsMap.set("Python", { name: "Python", level: "Expert", years: experience });
-    detectedSkillsMap.set("Java", { name: "Java", level: "Expert", years: experience });
-    detectedSkillsMap.set("SQL", { name: "SQL", level: "Expert", years: experience });
   }
 
   const skills: Skill[] = Array.from(detectedSkillsMap.values());
@@ -639,9 +626,9 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
   // Determine Role, Organization, and Designation
   let trainerType: TrainerType = "Technical Trainer";
   let designation = "";
-  let organization = "Independent / ATOM Faculty";
+  let organization = "";
 
-  // Check role & company from work experience line e.g. "Software Developer | ATOM | March 2025 – PRESENT"
+  // Check role & company from work experience line
   const workMatch = cleanText.match(
     /(?:Software\s+Developer|Full\s+Stack\s+Developer|Web\s+Developer|Python\s+Developer|Java\s+Developer|Technical\s+Trainer|Corporate\s+Trainer|Trainer|Faculty|Instructor)\s*\|\s*([^|\n]+)\s*\|\s*([^|\n]+)/i,
   );
@@ -650,7 +637,7 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
       /(Software\s+Developer|Full\s+Stack\s+Developer|Web\s+Developer|Python\s+Developer|Java\s+Developer|Technical\s+Trainer|Corporate\s+Trainer)/i,
     );
     if (rolePart) {
-      designation = `${toTitleCase(rolePart[0])} & Technical Trainer`;
+      designation = `${toTitleCase(rolePart[0])} & Trainer`;
     }
     if (workMatch[1] && workMatch[1].trim().length < 30) {
       organization = workMatch[1].trim();
@@ -684,23 +671,20 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
     ),
   );
 
-  if (!designation) {
-    if (hasSoftSkills && !hasTechSkills) {
-      trainerType = "Soft Skills Trainer";
-      designation = "Lead Aptitude & Soft Skills Trainer";
-    } else if (hasSoftSkills && hasTechSkills) {
-      trainerType = "Technical Trainer";
-      designation = "Full Stack & Placement Readiness Trainer";
-    } else if (skills.some((s) => ["Python", "Django", "Machine Learning"].includes(s.name))) {
-      designation = "Python & Full Stack Trainer";
-    } else if (skills.some((s) => ["Java", "Spring Boot"].includes(s.name))) {
-      designation = "Java Full Stack Technical Trainer";
-    } else {
-      designation = "Technical & Corporate Trainer";
-    }
+  if (hasSoftSkills && !hasTechSkills) {
+    trainerType = "Soft Skills Trainer";
+    if (!designation) designation = "Aptitude & Soft Skills Trainer";
+  } else if (hasSoftSkills && hasTechSkills) {
+    trainerType = "Technical Trainer";
+    if (!designation) designation = "Technical & Soft Skills Trainer";
+  } else if (skills.length > 0) {
+    trainerType = "Technical Trainer";
+    if (!designation) designation = `${skills[0].name} Trainer`;
+  } else if (!designation) {
+    designation = "Trainer";
   }
 
-  // 7. Bio / Professional Summary Extraction (Extract the REAL text from candidate's resume)
+  // 7. Bio / Professional Summary Extraction
   let bio = "";
 
   // Strategy A: Check section headers (Objective, Summary, Profile, About Me)
@@ -713,12 +697,12 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
       .replace(/^[•\-*]\s*/gm, "")
       .replace(/\s+/g, " ")
       .trim();
-    if (extractedBio.length >= 30 && !isSectionHeading(extractedBio)) {
+    if (extractedBio.length >= 25 && !isSectionHeading(extractedBio)) {
       bio = extractedBio;
     }
   }
 
-  // Strategy B: Check introductory paragraph in top 8 lines (e.g. right below contact info and above Technical Skills)
+  // Strategy B: Check introductory paragraph in top 8 lines
   if (!bio) {
     for (let i = 1; i < Math.min(rawLines.length, 8); i++) {
       const line = rawLines[i];
@@ -735,19 +719,6 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
     }
   }
 
-  // Strategy C: Tailored bio with candidate's actual details
-  if (!bio) {
-    const topSkillsStr = skills
-      .slice(0, 5)
-      .map((s) => s.name)
-      .join(", ");
-    const expStr =
-      experience > 0
-        ? `${experience} year${experience > 1 ? "s" : ""} of experience`
-        : "hands-on project expertise";
-    bio = `${name} is a ${designation} based in ${city} with ${expStr}, specializing in ${topSkillsStr}. Experienced in delivering structured project mentoring and technical sessions.`;
-  }
-
   // 8. Education Extraction
   const education: { degree: string; field?: string; college: string; year: number }[] = [];
   const eduMatches = cleanText.matchAll(
@@ -758,18 +729,6 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
       college: m[1].trim(),
       degree: m[2].trim(),
       year: parseInt(m[3], 10),
-    });
-  }
-
-  if (education.length === 0) {
-    education.push({
-      degree: /mca|m\.?tech|master/i.test(cleanText)
-        ? "Master in Computer Application (MCA)"
-        : "Bachelor in Computer Application (BCA)",
-      college: /chanakya/i.test(cleanText)
-        ? "Chanakya University"
-        : "State Technological University",
-      year: 2025,
     });
   }
 
@@ -784,23 +743,15 @@ export function parseTrainerProfileText(text: string, fileName?: string): Extrac
       .map((l) => l.replace(/^[•\-*\s]+/, "").trim())
       .filter((l) => l.length > 5 && !isSectionHeading(l));
     for (const cl of certLines) {
-      certifications.push({ name: cl, issuer: "Industry Credential" });
+      certifications.push({ name: cl, issuer: "Credential" });
     }
-  }
-
-  if (certifications.length === 0) {
-    certifications.push({
-      name: `Certified ${skills[0]?.name || "Full Stack"} Developer & Corporate Trainer`,
-      issuer: "ATOM Academy Accreditation",
-      year: new Date().getFullYear() - 1,
-    });
   }
 
   return {
     name,
     designation,
     organization,
-    email: email || `${name.toLowerCase().replace(/[^a-z0-9]/g, "") || "trainer"}@atom.ac.in`,
+    email,
     phone,
     whatsapp: phone,
     city,

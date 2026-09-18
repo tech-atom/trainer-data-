@@ -630,12 +630,9 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
       const name = nameKey && r[nameKey] ? String(r[nameKey]).trim() : "";
       const phone = phoneKey && r[phoneKey] !== undefined ? cleanPhoneStr(r[phoneKey]) : "";
       const domain = domainKey && r[domainKey] ? String(r[domainKey]).trim() : "Aptitude & Soft Skills";
-      const email =
-        emailKey && r[emailKey]
-          ? String(r[emailKey]).trim()
-          : `${(name || "trainer").toLowerCase().replace(/[^a-z0-9]/g, "")}@atom.ac.in`;
-      const city = cityKey && r[cityKey] ? String(r[cityKey]).trim() : "Bangalore";
-      const exp = expKey && r[expKey] ? Number(r[expKey]) || 5 : 5;
+      const email = emailKey && r[emailKey] ? String(r[emailKey]).trim() : "";
+      const city = cityKey && r[cityKey] ? String(r[cityKey]).trim() : "";
+      const exp = expKey && r[expKey] ? Number(r[expKey]) || 0 : 0;
 
       if (!name && !phone) continue;
 
@@ -657,27 +654,25 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
         id: `bulk-excel-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 5)}`,
         name: name || "Unnamed Trainer",
         designation: `${domain} Trainer`,
-        phone: phone || "9845000000",
-        whatsapp: phone || "9845000000",
+        phone: phone || "",
+        whatsapp: phone || "",
         email,
         city,
-        state: "Karnataka",
+        state: city ? "Karnataka" : "",
         experience: exp,
-        trainingExperience: Math.max(1, Math.round(exp * 0.75)),
+        trainingExperience: Math.max(0, Math.round(exp * 0.75)),
         trainerType:
           domain.toLowerCase().includes("aptitude") || domain.toLowerCase().includes("soft skills")
             ? "Aptitude Trainer"
             : "Technical Trainer",
         skills,
         bio: `Experienced corporate faculty specializing in ${domain}.`,
-        education: [{ degree: "B.Tech / MCA", college: "State University", year: 2024 - exp }],
-        certifications: [
-          { name: `Certified ${skills[0]?.name || "Domain"} Trainer`, issuer: "ATOM Accreditation" },
-        ],
+        education: [],
+        certifications: [],
         fileName: file.name,
-        selected: Boolean(name && phone && phone.length >= 7),
+        selected: Boolean(name && phone && phone.replace(/\D/g, "").length >= 7 && !dup.isDuplicate),
         isDuplicate: dup.isDuplicate,
-        duplicateReason: dup.reason,
+        duplicateReason: !phone || phone.replace(/\D/g, "").length < 7 ? "Missing phone number (mandatory)" : dup.reason,
       });
     }
 
@@ -724,9 +719,9 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
             ...parsed,
             id: `bulk-item-${Date.now()}-${i}`,
             fileName: file.name,
-            selected: true,
+            selected: Boolean(parsed.name && parsed.phone && parsed.phone.replace(/\D/g, "").length >= 7 && !dup.isDuplicate),
             isDuplicate: dup.isDuplicate,
-            duplicateReason: dup.reason,
+            duplicateReason: !parsed.phone || parsed.phone.replace(/\D/g, "").length < 7 ? "Missing phone number (mandatory)" : dup.reason,
           });
         }
       } catch (err) {
@@ -894,6 +889,12 @@ export function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalP
     const selected = items.filter((i) => i.selected);
     if (selected.length === 0) {
       toast.error("Please select at least one trainer to import.");
+      return;
+    }
+
+    const missingPhone = selected.filter((i) => !i.phone || i.phone.replace(/\D/g, "").length < 7);
+    if (missingPhone.length > 0) {
+      toast.error(`Phone number is mandatory. ${missingPhone.length} selected trainer(s) do not have a valid phone number.`);
       return;
     }
 

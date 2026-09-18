@@ -140,8 +140,8 @@ export function ExcelBulkUploadModal({
       const rawDomain =
         domainKey && row[domainKey] ? String(row[domainKey]).trim() : "Aptitude & Soft Skills";
       const rawEmail = emailKey && row[emailKey] ? String(row[emailKey]).trim() : undefined;
-      const rawCity = cityKey && row[cityKey] ? String(row[cityKey]).trim() : "Bangalore";
-      const rawExp = expKey && row[expKey] ? Number(row[expKey]) || 5 : 5;
+      const rawCity = cityKey && row[cityKey] ? String(row[cityKey]).trim() : "";
+      const rawExp = expKey && row[expKey] ? Number(row[expKey]) || 0 : 0;
 
       // Skip completely blank rows
       if (!rawName && !rawPhone && !rawDomain) continue;
@@ -152,9 +152,9 @@ export function ExcelBulkUploadModal({
       if (!rawName) {
         isValid = false;
         errorReason = "Missing trainer name";
-      } else if (!rawPhone || rawPhone.length < 7) {
+      } else if (!rawPhone || rawPhone.replace(/\D/g, "").length < 7) {
         isValid = false;
-        errorReason = "Missing or invalid phone number";
+        errorReason = "Missing phone number (mandatory)";
       }
 
       const dup = checkDuplicate(rawPhone, rawEmail || "", rawName);
@@ -167,7 +167,7 @@ export function ExcelBulkUploadModal({
         email: rawEmail,
         city: rawCity,
         experience: rawExp,
-        selected: isValid,
+        selected: isValid && !dup.isDuplicate,
         isDuplicate: dup.isDuplicate,
         duplicateReason: dup.reason,
         isValid,
@@ -294,7 +294,7 @@ export function ExcelBulkUploadModal({
           name: name || "Unnamed Trainer",
           phone: phone || "",
           domain: domain || "Aptitude & Soft Skills",
-          selected: isValid,
+          selected: isValid && !dup.isDuplicate,
           isDuplicate: dup.isDuplicate,
           duplicateReason: dup.reason,
           isValid,
@@ -459,9 +459,7 @@ export function ExcelBulkUploadModal({
             ? "Aptitude Trainer"
             : "Technical Trainer";
 
-        const email =
-          item.email ||
-          `${item.name.toLowerCase().replace(/[^a-z0-9]/g, "")}@atom.ac.in`;
+        const email = item.email ? item.email.trim() : "";
 
         return {
           name: item.name.trim(),
@@ -469,43 +467,29 @@ export function ExcelBulkUploadModal({
           phone: item.phone.trim(),
           whatsapp: item.phone.trim(),
           email,
-          city: item.city || "Bangalore",
-          state: "Karnataka",
+          city: item.city || "",
+          state: item.city ? "Karnataka" : "",
           country: "India",
           organization: "ATOM Faculty / Consultant",
-          experience: item.experience || 5,
-          trainingExperience: Math.max(1, Math.round((item.experience || 5) * 0.75)),
+          experience: item.experience || 0,
+          trainingExperience: Math.max(0, Math.round((item.experience || 0) * 0.75)),
           trainerType,
           employment: "Freelance",
           modes: ["Online", "Offline", "Hybrid"],
           availability: "available",
           rating: 4.8,
           projectsCompleted: 8,
-          bio: `Experienced corporate faculty specializing in ${domainText}.`,
+          bio: `Quick contact in ${domainText}.`,
           status: "Active",
-          tags: ["Excel Bulk Import", "Verified", ...parsedSkillNames.slice(0, 2)],
+          tags: ["Quick Contact", "Excel Bulk Import", domainText, ...parsedSkillNames.slice(0, 2)],
           skills,
           softSkills: softSkills.length > 0 ? softSkills : ["Communication"],
-          education: [
-            {
-              degree: "B.Tech / B.E. / MCA",
-              specialization: domainText,
-              university: "State University",
-              year: 2020,
-            },
-          ],
-          certifications: [
-            {
-              name: `Certified ${domainText} Trainer`,
-              org: "ATOM Accreditation",
-              id: "CERT-" + Math.floor(1000 + Math.random() * 9000),
-              issued: new Date().toISOString().split("T")[0],
-            },
-          ],
+          education: [],
+          certifications: [],
           trainings: [],
           notes: [
             {
-              note: `Bulk imported via Excel (Name: ${item.name}, Phone: ${item.phone}, Domain: ${domainText}).`,
+              note: `Bulk imported via Excel / CSV (Name: ${item.name}, Phone: ${item.phone}, Domain: ${domainText}).`,
               by: "Admin",
               date: new Date().toISOString().split("T")[0],
             },

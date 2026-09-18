@@ -17,14 +17,16 @@ export function SimpleTrainerCard({
   matchScore,
   onViewDetails,
 }: SimpleTrainerCardProps) {
-  // Format WhatsApp Link with prefilled text
-  const cleanPhone = trainer.whatsapp.replace(/[^0-9]/g, "");
+  const cleanPhone = (trainer.whatsapp || trainer.phone || "").replace(/[^0-9]/g, "");
+  const hasValidPhone = cleanPhone.length >= 7;
   const whatsappNumber = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-    `Hello ${trainer.name}, We are from Team ATOM, and we are currently looking for a trainer. We would like to check your availability and discuss the opportunity with you.
+  const whatsappUrl = hasValidPhone
+    ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+        `Hello ${trainer.name}, We are from Team ATOM, and we are currently looking for a trainer. We would like to check your availability and discuss the opportunity with you.
 
 Please let us know a convenient time to connect.`,
-  )}`;
+      )}`
+    : "#";
 
   const isMatchingTerm = (skillName: string) => {
     if (!activeRequirementTerms.length) return false;
@@ -59,17 +61,21 @@ Please let us know a convenient time to connect.`,
                   </span>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground font-medium">{trainer.designation}</p>
+              <p className="text-xs text-muted-foreground font-medium">{trainer.designation || "Trainer"}</p>
             </div>
           </div>
         </div>
 
         {/* Info row */}
         <div className="mt-3.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <MapPin className="h-3.5 w-3.5 text-primary" /> {trainer.city}
-          </span>
-          <span>•</span>
+          {trainer.city && (
+            <>
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5 text-primary" /> {trainer.city}
+              </span>
+              <span>•</span>
+            </>
+          )}
           <span
             className={`transition-all ${
               minExperience && trainer.experience >= minExperience
@@ -83,21 +89,25 @@ Please let us know a convenient time to connect.`,
 
         {/* Skills Pills */}
         <div className="mt-3.5 flex flex-wrap gap-1.5">
-          {trainer.skills.map((skill) => {
-            const isMatch = isMatchingTerm(skill.name);
-            return (
-              <span
-                key={skill.name}
-                className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold transition-all ${
-                  isMatch
-                    ? "bg-emerald-500 text-white font-bold shadow-xs scale-105"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {skill.name}
-              </span>
-            );
-          })}
+          {trainer.skills && trainer.skills.length > 0 ? (
+            trainer.skills.map((skill) => {
+              const isMatch = isMatchingTerm(skill.name);
+              return (
+                <span
+                  key={skill.name}
+                  className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold transition-all ${
+                    isMatch
+                      ? "bg-emerald-500 text-white font-bold shadow-xs scale-105"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {skill.name}
+                </span>
+              );
+            })
+          ) : (
+            <span className="text-[11px] text-muted-foreground italic">No skills listed</span>
+          )}
         </div>
 
         {/* Short Bio snippet */}
@@ -112,32 +122,60 @@ Please let us know a convenient time to connect.`,
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
         {/* Quick Contact Icons */}
         <div className="flex items-center gap-1.5">
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={`WhatsApp ${trainer.name}`}
-            className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 transition-colors cursor-pointer"
-          >
-            <MessageCircle className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">WhatsApp</span>
-          </a>
+          {hasValidPhone ? (
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`WhatsApp ${trainer.name} (${trainer.whatsapp || trainer.phone})`}
+              className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">WhatsApp</span>
+            </a>
+          ) : (
+            <span
+              title="No phone number available"
+              className="inline-flex items-center gap-1 rounded-xl bg-muted/60 border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground opacity-60 cursor-not-allowed"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">No Phone</span>
+            </span>
+          )}
 
-          <a
-            href={`tel:${trainer.phone}`}
-            title={`Call ${trainer.name}`}
-            className="rounded-xl border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-          >
-            <Phone className="h-3.5 w-3.5" />
-          </a>
+          {trainer.phone ? (
+            <a
+              href={`tel:${trainer.phone}`}
+              title={`Call ${trainer.name} (${trainer.phone})`}
+              className="rounded-xl border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+            >
+              <Phone className="h-3.5 w-3.5" />
+            </a>
+          ) : (
+            <span
+              title="No phone number"
+              className="rounded-xl border border-border/40 p-1.5 text-muted-foreground/40 cursor-not-allowed"
+            >
+              <Phone className="h-3.5 w-3.5" />
+            </span>
+          )}
 
-          <a
-            href={`mailto:${trainer.email}`}
-            title={`Email ${trainer.name}`}
-            className="rounded-xl border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-          >
-            <Mail className="h-3.5 w-3.5" />
-          </a>
+          {trainer.email ? (
+            <a
+              href={`mailto:${trainer.email}`}
+              title={`Email ${trainer.name} (${trainer.email})`}
+              className="rounded-xl border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+            >
+              <Mail className="h-3.5 w-3.5" />
+            </a>
+          ) : (
+            <span
+              title="No email address"
+              className="rounded-xl border border-border/40 p-1.5 text-muted-foreground/40 cursor-not-allowed"
+            >
+              <Mail className="h-3.5 w-3.5" />
+            </span>
+          )}
         </div>
 
         {/* View Profile Modal Button */}

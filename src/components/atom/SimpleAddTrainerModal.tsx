@@ -47,14 +47,14 @@ export function SimpleAddTrainerModal({
   const [trainerType, setTrainerType] = useState<TrainerType>("Technical Trainer");
 
   // Location & Org
-  const [city, setCity] = useState("Bangalore");
-  const [state, setState] = useState("Karnataka");
-  const [organization, setOrganization] = useState("Independent Consultant");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [organization, setOrganization] = useState("");
 
   // Experience & Modes
-  const [experience, setExperience] = useState(5);
-  const [trainingExperience, setTrainingExperience] = useState(4);
-  const [projectsCompleted, setProjectsCompleted] = useState(10);
+  const [experience, setExperience] = useState(3);
+  const [trainingExperience, setTrainingExperience] = useState(2);
+  const [projectsCompleted, setProjectsCompleted] = useState(0);
   const [availability, setAvailability] = useState<Availability>("available");
   const [selectedModes, setSelectedModes] = useState<Mode[]>(["Online", "Offline"]);
   const [selectedSectors, setSelectedSectors] = useState<
@@ -63,12 +63,12 @@ export function SimpleAddTrainerModal({
 
   // Skills
   const [skillsInput, setSkillsInput] = useState("");
-  const [softSkillsInput, setSoftSkillsInput] = useState("Communication, Problem Solving, Interview Prep");
+  const [softSkillsInput, setSoftSkillsInput] = useState("");
 
   // Education
-  const [degree, setDegree] = useState("B.E. / B.Tech");
-  const [specialization, setSpecialization] = useState("Computer Science");
-  const [university, setUniversity] = useState("VTU");
+  const [degree, setDegree] = useState("");
+  const [specialization, setSpecialization] = useState("");
+  const [university, setUniversity] = useState("");
   const [gradYear, setGradYear] = useState(new Date().getFullYear() - 5);
 
   // Certifications & Bio
@@ -108,13 +108,15 @@ export function SimpleAddTrainerModal({
       toast.error("Please enter the trainer's name.");
       return;
     }
-    if (!phone.trim()) {
-      toast.error("Please enter the phone number.");
+    const cleanPhone = phone.replace(/[^0-9]/g, "");
+    if (!phone.trim() || cleanPhone.length < 7) {
+      toast.error("Phone number is mandatory. Please enter a valid phone number (at least 7-10 digits).");
       return;
     }
 
     if (duplicateCheck.isDuplicate) {
-      toast.warning(`Duplicate warning: ${duplicateCheck.reason}`);
+      toast.error(`Cannot save duplicate: ${duplicateCheck.reason}`);
+      return;
     }
 
     setIsSubmitting(true);
@@ -136,13 +138,15 @@ export function SimpleAddTrainerModal({
               level: "Expert" as SkillLevel,
               years: Math.max(1, Math.min(experience, 8)),
             }))
-          : [
-              {
-                name: designation || trainerType.replace(" Trainer", ""),
-                level: "Expert" as SkillLevel,
-                years: experience,
-              },
-            ];
+          : designation
+            ? [
+                {
+                  name: designation,
+                  level: "Expert" as SkillLevel,
+                  years: experience || 1,
+                },
+              ]
+            : [];
 
       // Parse soft skills
       const softSkills = softSkillsInput
@@ -162,19 +166,10 @@ export function SimpleAddTrainerModal({
           issued: new Date().toISOString().split("T")[0],
         }));
 
-      const finalEmail =
-        email.trim() ||
-        `${name.trim().toLowerCase().replace(/[^a-z0-9]/g, ".")}@atom.ac.in`;
-
+      const finalEmail = email.trim();
       const finalWhatsapp = whatsapp.trim() || phone.trim();
-
-      const finalDesignation =
-        designation.trim() ||
-        `${skills[0]?.name || trainerType.replace(" Trainer", "")} Specialist`;
-
-      const finalBio =
-        bio.trim() ||
-        `Experienced ${trainerType} with ${experience} years experience delivering ${selectedModes.join(", ")} training programs across ${city} and Pan-India.`;
+      const finalDesignation = designation.trim() || (skills[0]?.name ? `${skills[0].name} Trainer` : `${trainerType}`);
+      const finalBio = bio.trim();
 
       const newTrainer = await addTrainer({
         name: name.trim(),
@@ -186,26 +181,26 @@ export function SimpleAddTrainerModal({
         state: state.trim(),
         country: "India",
         organization: organization.trim(),
-        experience: Number(experience) || 5,
-        trainingExperience: Number(trainingExperience) || 4,
+        experience: Number(experience) || 0,
+        trainingExperience: Number(trainingExperience) || 0,
         trainerType,
         employment: "Freelance",
         modes: selectedModes,
         availability,
-        rating: 4.8,
-        projectsCompleted: Number(projectsCompleted) || 10,
+        rating: 5.0,
+        projectsCompleted: Number(projectsCompleted) || 0,
         bio: finalBio,
         status: "Active",
-        tags: [trainerType.replace(" Trainer", ""), city, "Verified"],
+        tags: ["Full Profile", "Verified Profile", trainerType.replace(" Trainer", ""), city].filter(Boolean),
         skills,
         softSkills,
-        education: degree
+        education: (degree.trim() || university.trim())
           ? [
               {
                 degree: degree.trim(),
                 specialization: specialization.trim(),
                 university: university.trim(),
-                year: Number(gradYear) || 2018,
+                year: Number(gradYear) || new Date().getFullYear(),
               },
             ]
           : [],

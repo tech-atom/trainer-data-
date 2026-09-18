@@ -94,15 +94,15 @@ export function CompleteProfileModal({
       setName(trainer.name || "");
       setPhone(trainer.phone || "");
       setWhatsapp(trainer.whatsapp || trainer.phone || "");
-      setEmail(trainer.email || `${(trainer.name || "trainer").toLowerCase().replace(/\s+/g, "")}@atom.ac.in`);
-      setDesignation(trainer.designation || `${trainer.skills?.[0]?.name || "Corporate"} Trainer`);
+      setEmail(trainer.email || "");
+      setDesignation(trainer.designation || "");
       setTrainerType(trainer.trainerType || "Technical Trainer");
-      setCity(trainer.city || "Bangalore");
-      setState(trainer.state || "Karnataka");
-      setOrganization(trainer.organization || "Independent / ATOM Faculty");
-      setExperience(trainer.experience || 5);
-      setTrainingExperience(trainer.trainingExperience || 4);
-      setProjectsCompleted(trainer.projectsCompleted || 10);
+      setCity(trainer.city || "");
+      setState(trainer.state || "");
+      setOrganization(trainer.organization || "");
+      setExperience(trainer.experience || 0);
+      setTrainingExperience(trainer.trainingExperience || 0);
+      setProjectsCompleted(trainer.projectsCompleted || 0);
       setEmployment(trainer.employment || "Freelance");
       setAvailability(trainer.availability || "available");
       setSelectedModes(trainer.modes && trainer.modes.length > 0 ? trainer.modes : ["Online", "Offline"]);
@@ -114,20 +114,20 @@ export function CompleteProfileModal({
 
       const softSkillNames = trainer.softSkills && trainer.softSkills.length > 0
         ? trainer.softSkills.join(", ")
-        : "Communication, Interview Prep, Problem Solving";
+        : "";
       setSoftSkillsInput(softSkillNames);
 
       // Education
       if (trainer.education && trainer.education.length > 0) {
         const edu = trainer.education[0];
-        setDegree(edu.degree || "B.E. / B.Tech");
-        setSpecialization(edu.specialization || "Engineering");
-        setUniversity(edu.university || "VTU");
+        setDegree(edu.degree || "");
+        setSpecialization(edu.specialization || "");
+        setUniversity(edu.university || "");
         setGradYear(edu.year || new Date().getFullYear() - 5);
       } else {
-        setDegree("B.E. / B.Tech");
-        setSpecialization("Computer Science / Engineering");
-        setUniversity("State University");
+        setDegree("");
+        setSpecialization("");
+        setUniversity("");
         setGradYear(new Date().getFullYear() - 5);
       }
 
@@ -139,11 +139,7 @@ export function CompleteProfileModal({
       }
 
       // Bio
-      setBio(
-        trainer.bio && !trainer.bio.startsWith("Quick contact")
-          ? trainer.bio
-          : `Experienced ${trainer.designation || "trainer"} with proven track record in campus placement preparation, hands-on workshops, and corporate training.`,
-      );
+      setBio(trainer.bio || "");
     }
   }, [trainer, isOpen]);
 
@@ -175,8 +171,9 @@ export function CompleteProfileModal({
       toast.error("Trainer name is required.");
       return;
     }
-    if (!phone.trim()) {
-      toast.error("Phone number is required.");
+    const cleanPhone = phone.replace(/[^0-9]/g, "");
+    if (!phone.trim() || cleanPhone.length < 7) {
+      toast.error("Phone number is mandatory. Please enter a valid phone number (at least 7-10 digits).");
       return;
     }
 
@@ -244,33 +241,25 @@ export function CompleteProfileModal({
       );
 
       // Education payload
-      const education = [
-        {
-          degree: degree.trim(),
-          specialization: specialization.trim(),
-          university: university.trim(),
-          year: Number(gradYear),
-        },
-      ];
+      const education = (degree.trim() || university.trim())
+        ? [
+            {
+              degree: degree.trim(),
+              specialization: specialization.trim(),
+              university: university.trim(),
+              year: Number(gradYear) || new Date().getFullYear(),
+            },
+          ]
+        : [];
 
       // Documents payload
-      const documents =
-        trainer.documents && trainer.documents.length > 0
-          ? trainer.documents
-          : [
-              {
-                name: `${name.trim()} Profile.pdf`,
-                type: "Profile PDF",
-                date: new Date().toISOString().split("T")[0],
-                by: "Admin",
-              },
-            ];
+      const documents = trainer.documents || [];
 
       await updateTrainer(trainer.id, {
         name: name.trim(),
         phone: phone.trim(),
         whatsapp: whatsapp.trim() || phone.trim(),
-        email: email.trim() || `${name.trim().toLowerCase().replace(/\s+/g, "")}@atom.ac.in`,
+        email: email.trim(),
         designation: designation.trim(),
         trainerType,
         city: city.trim(),

@@ -46,6 +46,10 @@ export function SimplePhoneList({
   const [isAdding, setIsAdding] = useState(false);
 
   const copyPhone = (trainer: Trainer) => {
+    if (!trainer.phone || !trainer.phone.trim()) {
+      toast.info(`No phone number available for ${trainer.name}`);
+      return;
+    }
     navigator.clipboard.writeText(trainer.phone);
     setCopiedId(trainer.id);
     toast.success(`Copied ${trainer.name}'s phone (${trainer.phone})`);
@@ -53,9 +57,16 @@ export function SimplePhoneList({
   };
 
   const copyAllNumbers = () => {
-    const numbers = trainers.map(({ trainer }) => trainer.phone).join(", ");
+    const numbers = trainers
+      .map(({ trainer }) => trainer.phone)
+      .filter((p) => p && p.trim().length > 0)
+      .join(", ");
+    if (!numbers) {
+      toast.info("No phone numbers available to copy.");
+      return;
+    }
     navigator.clipboard.writeText(numbers);
-    toast.success(`Copied ${trainers.length} phone numbers to clipboard!`);
+    toast.success(`Copied phone numbers to clipboard!`);
   };
 
   const handleExcelFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,10 +87,11 @@ export function SimplePhoneList({
       return;
     }
 
-    const domainName = quickDomain.trim() || "Aptitude & Soft Skills";
+    const domainName = quickDomain.trim() || "General Trainer";
     const dup = checkDuplicate(quickPhone, "", quickName);
     if (dup.isDuplicate) {
-      toast.warning(`Duplicate note: ${dup.reason}`);
+      toast.error(`Cannot add: ${dup.reason}`);
+      return;
     }
 
     setIsAdding(true);
@@ -95,32 +107,32 @@ export function SimplePhoneList({
       const skills = parsedSkillNames.map((s) => ({
         name: s,
         level: "Expert" as const,
-        years: 5,
+        years: 1,
       }));
 
       await addTrainer({
         name: quickName.trim(),
         phone: quickPhone.trim(),
         whatsapp: quickPhone.trim(),
-        email: `${quickName.trim().toLowerCase().replace(/\s+/g, "")}@atom.ac.in`,
-        city: "Bangalore",
-        state: "Karnataka",
+        email: "",
+        city: "",
+        state: "",
         country: "India",
-        organization: "ATOM Faculty",
+        organization: "",
         designation: `${domainName} Trainer`,
-        experience: 5,
-        trainingExperience: 4,
+        experience: 0,
+        trainingExperience: 0,
         trainerType: domainName.toLowerCase().includes("aptitude")
           ? "Aptitude Trainer"
           : domainName.toLowerCase().includes("soft skills")
             ? "Soft Skills Trainer"
             : "Technical Trainer",
-        skills: skills.length > 0 ? skills : [{ name: domainName, level: "Expert", years: 5 }],
+        skills: skills.length > 0 ? skills : [{ name: domainName, level: "Expert", years: 1 }],
         primarySkill: skills[0]?.name || domainName,
         modes: ["Online", "Offline", "Hybrid"],
         rating: 5.0,
-        projectsCompleted: 10,
-        bio: `Quick contact in ${domainName}.`,
+        projectsCompleted: 0,
+        bio: "",
         status: "Active",
         tags: ["Quick Contact", "Manual Quick Add", domainName],
         education: [],
@@ -129,7 +141,7 @@ export function SimplePhoneList({
         documents: [],
       });
 
-      toast.success(`Trainer "${quickName}" (${domainName}) added to Name, Phone & Domain directory!`);
+      toast.success(`Trainer "${quickName}" (${domainName}) added to directory!`);
       setQuickName("");
       setQuickPhone("");
       setQuickDomain("");
@@ -264,11 +276,14 @@ export function SimplePhoneList({
           <tbody className="divide-y divide-border text-foreground">
             {trainers.length > 0 ? (
               trainers.map(({ trainer, matchPercentage }, idx) => {
-                const cleanPhone = trainer.whatsapp.replace(/[^0-9]/g, "");
+                const cleanPhone = (trainer.whatsapp || trainer.phone || "").replace(/[^0-9]/g, "");
+                const hasValidPhone = cleanPhone.length >= 7;
                 const whatsappNumber = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-                const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-                  `Hello ${trainer.name}, We are from Team ATOM, and we are currently looking for a trainer. We would like to check your availability and discuss the opportunity with you. Please let us know a convenient time to connect.`,
-                )}`;
+                const whatsappUrl = hasValidPhone
+                  ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+                      `Hello ${trainer.name}, We are from Team ATOM, and we are currently looking for a trainer. We would like to check your availability and discuss the opportunity with you. Please let us know a convenient time to connect.`,
+                    )}`
+                  : "#";
 
                 return (
                   <tr key={trainer.id} className="hover:bg-muted/40 transition-colors group">
@@ -293,26 +308,30 @@ export function SimplePhoneList({
 
                     {/* Phone Number & Copy */}
                     <td className="py-3.5 px-4 font-mono font-bold text-foreground">
-                      <div className="flex items-center gap-2">
-                        <span>{trainer.phone}</span>
-                        <button
-                          onClick={() => copyPhone(trainer)}
-                          title="Copy phone number"
-                          className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-                        >
-                          {copiedId === trainer.id ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                      </div>
+                      {trainer.phone ? (
+                        <div className="flex items-center gap-2">
+                          <span>{trainer.phone}</span>
+                          <button
+                            onClick={() => copyPhone(trainer)}
+                            title="Copy phone number"
+                            className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+                          >
+                            {copiedId === trainer.id ? (
+                              <Check className="h-3.5 w-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/60 italic font-normal">Not provided</span>
+                      )}
                     </td>
 
                     {/* Domain */}
                     <td className="py-3.5 px-4">
                       <div className="flex flex-wrap gap-1">
-                        {trainer.skills.slice(0, 3).map((s) => (
+                        {trainer.skills && trainer.skills.slice(0, 3).map((s) => (
                           <span
                             key={s.name}
                             className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300"
@@ -320,9 +339,9 @@ export function SimplePhoneList({
                             {s.name}
                           </span>
                         ))}
-                        {trainer.skills.length === 0 && (
-                          <span className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
-                            {trainer.primarySkill || "Aptitude"}
+                        {(!trainer.skills || trainer.skills.length === 0) && (
+                          <span className="rounded-lg bg-muted border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+                            {trainer.primarySkill || "General"}
                           </span>
                         )}
                       </div>
@@ -347,24 +366,36 @@ export function SimplePhoneList({
                     {/* Quick Contact Buttons */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        <a
-                          href={whatsappUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition-colors cursor-pointer"
-                        >
-                          <MessageCircle className="h-3.5 w-3.5" />
-                          <span>WhatsApp</span>
-                        </a>
+                        {hasValidPhone ? (
+                          <a
+                            href={whatsappUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition-colors cursor-pointer"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" />
+                            <span>WhatsApp</span>
+                          </a>
+                        ) : (
+                          <span
+                            title="No phone number"
+                            className="inline-flex items-center gap-1 rounded-xl bg-muted/60 border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground opacity-50 cursor-not-allowed"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" />
+                            <span>No Phone</span>
+                          </span>
+                        )}
 
-                        <a
-                          href={`tel:${trainer.phone}`}
-                          title={`Call ${trainer.name}`}
-                          className="inline-flex items-center gap-1 rounded-xl border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
-                        >
-                          <Phone className="h-3.5 w-3.5 text-primary" />
-                          <span>Call</span>
-                        </a>
+                        {trainer.phone ? (
+                          <a
+                            href={`tel:${trainer.phone}`}
+                            title={`Call ${trainer.name}`}
+                            className="inline-flex items-center gap-1 rounded-xl border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+                          >
+                            <Phone className="h-3.5 w-3.5 text-primary" />
+                            <span>Call</span>
+                          </a>
+                        ) : null}
 
                         <button
                           onClick={() => handleDelete(trainer.id, trainer.name)}
